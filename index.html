@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jhon's Water Refilling Station</title>
+  <style>
+    /* (same styles as before) */
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg, #fff);
+      color: var(--text, #222);
+      margin: 20px auto;
+      max-width: 480px;
+      line-height: 1.4;
+      transition: background 0.3s, color 0.3s;
+    }
+    :root {
+      --primary: #3a86ff;
+      --danger: #e63946;
+      --success: #06d6a0;
+      --info: #ffbe0b;
+      --bg: #fff;
+      --text: #222;
+      --card: #f9f9f9;
+    }
+    body.dark {
+      --bg: #222;
+      --text: #eee;
+      --card: #333;
+    }
+    h1, h2 {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-top: 20px;
+      margin-bottom: 6px;
+    }
+    input[type=number], select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+    input:focus {
+      border-color: var(--primary);
+      outline: none;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-bottom: 12px;
+      color: #fff;
+      background-color: var(--primary);
+      transition: background-color 0.25s ease;
+    }
+    button:hover:not(:disabled) { background-color: #1e5fcc; }
+    button.reset { background-color: var(--danger); margin-top: 20px; }
+    button.reset:hover:not(:disabled) { background-color: #b32a37; }
+    button.undo { background-color: var(--success); }
+    button.undo:hover:not(:disabled) { background-color: #05b58f; }
+    button.export { background-color: var(--info); }
+    button.export:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+    #currentStock {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 10px 0 25px;
+    }
+    #salesReport {
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #log {
+      font-size: 0.85rem;
+      max-height: 150px;
+      overflow-y: auto;
+      background: var(--card);
+      border: 1px solid #ddd;
+      padding: 12px;
+      border-radius: 4px;
+    }
+    #log div { margin-bottom: 4px; }
+    .log-added { color: var(--success); }
+    .log-released { color: var(--primary); }
+    .log-modified { color: var(--danger); }
+    .log-info { color: var(--info); }
+    
+    /* Toast container and toast styles */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 300px;
+    }
+    .toast {
+      background-color: var(--card);
+      border-left: 5px solid;
+      padding: 12px 16px;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-weight: 600;
+      color: var(--text);
+      opacity: 0.95;
+      transition: opacity 0.3s ease;
+    }
+    .toast-success { border-color: var(--success); }
+    .toast-error { border-color: var(--danger); }
+    .toast-info { border-color: var(--info); }
+  </style>
+</head>
+<body>
+
+  <h1>Jhon's Water Refilling Station Inventory</h1>
+
+  <button onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+
+  <h2>Item: Widget</h2>
+  <input type="number" id="itemQuantity" placeholder="Quantity to Add" min="0" max="10000" />
+  <button onclick="addStock()">Add Stock</button>
+
+  <h2>Release Stock</h2>
+  <input type="number" id="releaseQuantity" placeholder="Quantity to Release" min="0" max="10000" />
+  <button onclick="releaseStock()">Release</button>
+
+  <h2>Modify Stock</h2>
+  <input type="number" id="modifyQuantity" placeholder="Set Exact Quantity" min="0" max="10000" />
+  <button onclick="passwordModifyStock()">Modify</button>
+
+  <h2>Current Stock</h2>
+  <p id="currentStock">0</p>
+
+  <button class="undo" onclick="passwordUndoLastAction()">↩️ Undo Last Action</button>
+
+  <h2>Generate Graph</h2>
+  <select id="timeframe">
+    <option value="day">Day</option>
+    <option value="week" selected>Week</option>
+    <option value="month">Month</option>
+    <option value="year">Year</option>
+  </select>
+  <button onclick="generateGraph()">Generate</button>
+
+  <h2>Sales Report</h2>
+  <button onclick="showSalesReport()">Show Sales</button>
+  <p id="salesReport"></p>
+
+  <!-- <button class="export" disabled title="Export disabled for security">📤 Export Data</button> -->
+
+  <button onclick="passwordMasterReset()" class="reset">Master Reset</button>
+
+  <div id="chart">
+    <canvas id="stockChart" width="400" height="200"></canvas>
+  </div>
+
+  <h2>Process Log</h2>
+  <div id="log"></div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Data and state
+    let stock = JSON.parse(localStorage.getItem('widgetStock')) || 0;
+    let log = JSON.parse(localStorage.getItem('processLog')) || [];
+    let stockHistory = JSON.parse(localStorage.getItem('stockHistory')) || [];
+    let salesHistory = JSON.parse(localStorage.getItem('salesHistory')) || [];
+    let addHistory = JSON.parse(localStorage.getItem('addHistory')) || [];
+    let undoStack = JSON.parse(localStorage.getItem('undoStack')) || [];
+
+    const maxQty = 10000;
+    const toastContainer = document.getElementById('toast-container');
+
+    function showToast(message, type = 'info', duration = 3500) {
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerText = message;
+      toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    function validateQuantity(qty) {
+      if (isNaN(qty) || qty < 0) {
+        showToast('Enter a valid non-negative number.', 'error');
+        return false;
+      }
+      if (qty > maxQty) {
+        showToast(`Max allowed is ${maxQty}.`, 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function saveStock() {
+      localStorage.setItem('widgetStock', JSON.stringify(stock));
+      document.getElementById('currentStock').innerText = stock;
+      const now = new Date();
+      const timestamp = now.toISOString();
+      if (!stockHistory.length || stockHistory[stockHistory.length-1].value !== stock) {
+        stockHistory.push({ time: timestamp, value: stock });
+        if (stockHistory.length > 100) stockHistory.shift();
+        localStorage.setItem('stockHistory', JSON.stringify(stockHistory));
+      }
+    }
+
+    function saveLog(action, type='info') {
+      const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      const entry = `<div class="log-${type}">${timestamp}: ${action}</div>`;
+      log.unshift(entry);
+      if (log.length > 100) log.pop();
+      localStorage.setItem('processLog', JSON.stringify(log));
+      renderLog();
+    }
+
+    function renderLog() {
+      document.getElementById('log').innerHTML = log.join('');
+    }
+
+    function addStock() {
+      const qty = parseInt(document.getElementById('itemQuantity').value);
+      if (!validateQuantity(qty)) return;
+      stock += qty;
+      undoStack.push({ type: 'add', qty });
+      localStorage.setItem('undoStack', JSON.stringify(undoStack));
+      addHistory.push({ time: new Date().toISOString(), qty });
+      localStorage.setItem('addHistory', JSON.stringify(addHistory));
+      saveStock();
+      saveLog(`Added ${qty} units`, 'added');
+      showToast(`Added ${qty} units`, 'success');
+      document.getElementById('itemQuantity').value = '';
+    }
+
+    function releaseStock() {
+      const qty = parseInt(document.getElementById('releaseQuantity').value);
+      if (!validateQuantity(qty)) return;
+      const released = Math.min(stock, qty);
+      if (released === 0) {
+        showToast('No stock to release.', 'error');
+        return;
+      }
+      if (released > stock / 2) {
+        if (!confirm(`You are about to release ${released} units, which is more than half of current stock. Continue?`)) {
+          return;
+        }
+      }
+      stock = Math.max(0, stock - released);
+      undoStack.push({ type: 'release', qty: released });
+      localStorage.setItem('undoStack', JSON.stringify(undoStack));
+      salesHistory.push({ time: new Date().toISOString(), qty: released });
+      localStorage.setItem('salesHistory', JSON.stringify(salesHistory));
+      saveStock();
+      saveLog(`Released ${released} units`, 'released');
+      showToast(`Released ${released} units`, 'info');
+      document.getElementById('releaseQuantity').value = '';
+    }
+
+    // Password-protected modify
+    function passwordModifyStock() {
+      const pwd = prompt('Enter password to modify stock:');
+      if (pwd !== 'yes') {
+        showToast('Incorrect password. Modification cancelled.', 'error');
+        return;
+      }
+      modifyStock();
+    }
+
+    function modifyStock() {
+      const qty = parseInt(document.getElementById('modifyQuantity').value);
+      if (!validateQuantity(qty)) return;
+      if (qty === stock) {
+        showToast('Quantity is same as current stock.', 'info');
+        return;
+      }
+      if (Math.abs(qty - stock) > stock / 2) {
+        if (!confirm(`You are about to modify stock from ${stock} to ${qty} (more than 50% change). Continue?`)) return;
+      }
+      undoStack.push({ type: 'modify', previous: stock, newValue: qty });
+      localStorage.setItem('undoStack', JSON.stringify(undoStack));
+      stock = qty;
+      saveStock();
+      saveLog(`Modified stock to ${qty}`, 'modified');
+      showToast(`Stock modified to ${qty}`, 'success');
+      document.getElementById('modifyQuantity').value = '';
+    }
+
+    // Password-protected master reset
+    function passwordMasterReset() {
+      const pwd = prompt('Enter password to reset all data:');
+      if (pwd !== 'yes') {
+        showToast('Incorrect password. Reset cancelled.', 'error');
+        return;
+      }
+      masterReset();
+    }
+
+    function masterReset() {
+      if (!confirm('Are you sure you want to reset all data? This cannot be undone.')) return;
+
+      stock = 0;
+      log = [];
+      stockHistory = [];
+      salesHistory = [];
+      addHistory = [];
+      undoStack = [];
+
+      localStorage.clear();
+
+      saveStock();
+      renderLog();
+      showToast('System reset.', 'info');
+      if (chartInstance) chartInstance.destroy();
+      document.getElementById('salesReport').innerText = '';
+    }
+
+    // Password-protected Undo
+    function passwordUndoLastAction() {
+      const pwd = prompt('Enter password to undo last action:');
+      if (pwd !== 'yes') {
+        showToast('Incorrect password. Undo cancelled.', 'error');
+        return;
+      }
+      undoLastAction();
+    }
+
+    function undoLastAction() {
+      if (undoStack.length === 0) {
+        showToast('Nothing to undo.', 'info');
+        return;
+      }
+      const last = undoStack.pop();
+      localStorage.setItem('undoStack', JSON.stringify(undoStack));
+      switch (last.type) {
+        case 'add':
+          stock = Math.max(0, stock - last.qty);
+          saveLog(`Undo add: removed ${last.qty} units`, 'info');
+          break;
+        case 'release':
+          stock += last.qty;
+          saveLog(`Undo release: added back ${last.qty} units`, 'info');
+          break;
+        case 'modify':
+          stock = last.previous;
+          saveLog(`Undo modify: reverted to ${last.previous}`, 'info');
+          break;
+      }
+      saveStock();
+      showToast('Last action undone.', 'success');
+    }
+
+    // Aggregate data for graph
+    function aggregateData(history, timeframe) {
+      const now = new Date();
+      const buckets = {};
+
+      function getBucketKey(date) {
+        switch(timeframe) {
+          case 'day': return date.toISOString().slice(0,10);
+          case 'week': {
+            const firstDay = new Date(date);
+            const day = firstDay.getDay();
+            firstDay.setDate(firstDay.getDate() - day + (day === 0 ? -6 : 1)); // Monday as start
+            return firstDay.toISOString().slice(0,10);
+          }
+          case 'month': return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}`;
+          case 'year': return date.getFullYear().toString();
+        }
+      }
+
+      history.forEach(item => {
+        const date = new Date(item.time);
+        let include = false;
+        switch(timeframe) {
+          case 'day':
+            include = (date.toISOString().slice(0,10) === now.toISOString().slice(0,10));
+            break;
+          case 'week': {
+            // Current week boundaries
+            const weekStart = new Date(now);
+            const day = weekStart.getDay();
+            weekStart.setDate(weekStart.getDate() - day + (day === 0 ? -6 : 1));
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            include = (date >= weekStart && date <= weekEnd);
+            break;
+          }
+          case 'month':
+            include = (date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear());
+            break;
+          case 'year':
+            include = (date.getFullYear() === now.getFullYear());
+            break;
+        }
+        if (!include) return;
+
+        const key = getBucketKey(date);
+        if (!buckets[key]) buckets[key] = 0;
+        buckets[key] += item.qty || item.value || 0;
+      });
+
+      // Return sorted keys and values
+      const sortedKeys = Object.keys(buckets).sort();
+      const values = sortedKeys.map(k => buckets[k]);
+      return { keys: sortedKeys, values };
+    }
+
+    let chartInstance = null;
+
+    function generateGraph() {
+      const timeframe = document.getElementById('timeframe').value;
+      const salesData = aggregateData(salesHistory, timeframe);
+      const stockData = aggregateData(stockHistory, timeframe);
+
+      const ctx = document.getElementById('stockChart').getContext('2d');
+
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: salesData.keys.length ? salesData.keys : ['No Data'],
+          datasets: [
+            {
+              label: 'Sales',
+              data: salesData.values.length ? salesData.values : [0],
+              fill: false,
+              borderColor: 'rgba(54, 162, 235, 0.8)',
+              backgroundColor: 'rgba(54, 162, 235, 0.4)',
+              tension: 0.3,
+              borderWidth: 2,
+            },
+            {
+              label: 'Stock',
+              data: stockData.values.length ? stockData.values : [0],
+              fill: false,
+              borderColor: 'rgba(255, 99, 132, 0.8)',
+              backgroundColor: 'rgba(255, 99, 132, 0.4)',
+              tension: 0.3,
+              borderWidth: 2,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      showToast('Graph generated.', 'info');
+    }
+
+    function showSalesReport() {
+      if (salesHistory.length === 0) {
+        document.getElementById('salesReport').innerText = 'No sales data.';
+        showToast('No sales data.', 'info');
+        return;
+      }
+      const totalSales = salesHistory.reduce((a, e) => a + e.qty, 0);
+      const lastSaleDate = new Date(salesHistory[salesHistory.length - 1].time).toLocaleDateString();
+      document.getElementById('salesReport').innerText = `Total Sales: ${totalSales} units (Last sale: ${lastSaleDate})`;
+      showToast('Sales report shown.', 'info');
+    }
+
+    // Export disabled: do nothing and show toast
+    function exportData() {
+      showToast('Exporting data is disabled.', 'error');
+    }
+
+    // Dark mode toggle with persistent storage
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark');
+      }
+      saveStock();
+      renderLog();
+    });
+  </script>
+</body>
+</html>
